@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ask Like a Geographer — Teacher PD</title>
+
+<!-- ArcGIS Maps SDK for JavaScript -->
+<link rel="stylesheet" href="https://js.arcgis.com/4.30/esri/themes/light/main.css" />
+<script src="https://js.arcgis.com/4.30/"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Gelasio:ital,wght@0,500;0,700;1,500&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --ink:#22423a;
+    --ink-soft:#3f5c53;
+    --paper:#f1f3ee;
+    --card:#ffffff;
+    --river:#2e6e8e;
+    --river-soft:#e3edf2;
+    --ochre:#c4801f;
+    --ochre-soft:#f6ead6;
+    --rule:#ccd4cb;
+    --focus:#1b6f8c;
+    --radius:10px;
+    --panel-w:430px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:"Public Sans",system-ui,sans-serif;
+    color:var(--ink);
+    background:var(--paper);
+    display:flex;flex-direction:column;
+  }
+  button{font:inherit;cursor:pointer}
+  :focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+
+  /* ---------- header ---------- */
+  header{
+    background:var(--ink);
+    color:#eef2ea;
+    padding:14px 22px;
+    display:flex;align-items:baseline;gap:18px;flex-wrap:wrap;
+    position:relative;overflow:hidden;
+  }
+  /* graticule: faint lat/long grid, the map-world signature */
+  header::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;
+    background-image:
+      linear-gradient(to right,#eef2ea 1px,transparent 1px),
+      linear-gradient(to bottom,#eef2ea 1px,transparent 1px);
+    background-size:56px 56px;
+  }
+  .eyebrow{
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:#bcd0c6;font-weight:600;
+  }
+  header h1{
+    font-family:"Gelasio",Georgia,serif;font-weight:700;
+    font-size:clamp(20px,2.4vw,26px);line-height:1.1;
+  }
+  header .subtitle{font-size:13px;color:#cfdad0;max-width:52ch}
+
+  /* ---------- layout ---------- */
+  .app{flex:1;display:grid;grid-template-columns:var(--panel-w) 1fr;min-height:0}
+  #panel{
+    overflow-y:auto;border-right:1px solid var(--rule);
+    display:flex;flex-direction:column;
+  }
+  #viewDiv{min-height:0}
+
+  /* ---------- anchor strip ---------- */
+  .anchor{
+    padding:14px 22px;border-bottom:1px solid var(--rule);
+    background:var(--card);font-size:13px;line-height:1.5;
+  }
+  .anchor b{font-weight:600}
+
+  /* ---------- steps ---------- */
+  .stepnav{
+    display:flex;gap:6px;padding:16px 22px 0;
+  }
+  .stepnav button{
+    flex:1;border:1px solid var(--rule);background:var(--card);
+    border-radius:999px;padding:7px 4px;font-size:12px;font-weight:600;
+    color:var(--ink-soft);transition:background .15s,color .15s,border-color .15s;
+  }
+  .stepnav button[aria-current="step"]{
+    background:var(--ink);color:#fff;border-color:var(--ink);
+  }
+  .stepnav button.done:not([aria-current="step"])::before{content:"✓ ";color:var(--river)}
+
+  .step{padding:18px 22px 6px}
+  .coord{
+    font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--river);font-weight:700;margin-bottom:6px;
+  }
+  .step h2{
+    font-family:"Gelasio",Georgia,serif;font-weight:700;
+    font-size:24px;line-height:1.15;margin-bottom:10px;
+  }
+  .step p{font-size:14px;line-height:1.6;margin-bottom:12px}
+  .step p.why{color:var(--ink-soft)}
+
+  .tryit{
+    background:var(--river-soft);border:1px solid #c6dbe6;border-radius:var(--radius);
+    padding:12px 14px;margin-bottom:14px;font-size:13.5px;line-height:1.55;
+  }
+  .tryit .label{
+    font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    font-weight:700;color:var(--river);display:block;margin-bottom:4px;
+  }
+
+  .stems{list-style:none;margin-bottom:16px}
+  .stems li{
+    background:var(--card);border:1px solid var(--rule);border-left:4px solid var(--ochre);
+    border-radius:6px;padding:9px 12px;margin-bottom:7px;
+    font-size:13.5px;line-height:1.5;
+  }
+  .stems .tag{
+    display:block;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ochre);font-weight:700;margin-bottom:2px;
+  }
+
+  .stepactions{display:flex;gap:10px;padding:0 22px 18px}
+  .btn{
+    border-radius:8px;padding:10px 16px;font-weight:600;font-size:14px;
+    border:1px solid var(--ink);transition:transform .12s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--ochre);border-color:var(--ochre);color:#fff}
+  .btn.ghost{background:transparent;color:var(--ink)}
+  .btn[disabled]{opacity:.4;cursor:default}
+
+  /* ---------- question bank ---------- */
+  .bank{
+    margin-top:auto;border-top:1px solid var(--rule);background:#e9ede6;
+    padding:14px 22px 18px;
+  }
+  .bank h3{
+    font-family:"Gelasio",Georgia,serif;font-size:16px;margin-bottom:4px;
+  }
+  .bank .hint{font-size:12px;color:var(--ink-soft);margin-bottom:10px}
+  .bank ul{list-style:none}
+  .bank li{
+    background:var(--card);border:1px solid var(--rule);border-radius:6px;
+    padding:7px 10px;margin-bottom:6px;font-size:12.5px;line-height:1.45;
+    display:flex;gap:8px;align-items:baseline;
+    animation:slidein .3s ease both;
+  }
+  .bank li .c{
+    font-size:10px;letter-spacing:.14em;color:var(--river);font-weight:700;white-space:nowrap;
+  }
+  .bank .empty{font-size:12.5px;color:var(--ink-soft);font-style:italic}
+  .bank .copy{margin-top:8px;width:100%;background:var(--ink);color:#fff;border:none;
+    border-radius:8px;padding:9px;font-weight:600;font-size:13px}
+  @keyframes slidein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .bank li{animation:none}.btn:active{transform:none}
+  }
+
+  /* ---------- map notice ---------- */
+  .notice{
+    position:absolute;top:12px;right:12px;z-index:5;max-width:300px;
+    background:#fff;border:1px solid var(--rule);border-left:4px solid var(--ochre);
+    border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.5;
+    box-shadow:0 2px 8px rgba(0,0,0,.12);display:none;
+  }
+  .maparea{position:relative;display:flex;min-height:0}
+  .maparea #viewDiv{flex:1}
+
+  @media (max-width:860px){
+    .app{grid-template-columns:1fr;grid-template-rows:46vh 1fr}
+    .maparea{order:-1}
+    #panel{border-right:none;border-top:1px solid var(--rule)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <span class="eyebrow">Teacher PD · Geographic Inquiry · Example 1</span>
+    <h1>Ask Like a Geographer</h1>
+  </div>
+  <p class="subtitle">One repeatable questioning arc — what's where, why there, why care — practiced here on a standards-based concept.</p>
+</header>
+
+<div class="app">
+  <aside id="panel" aria-label="Lesson panel">
+    <div class="anchor">
+      <b>Standards anchor:</b> patterns of human settlement — <i>why did cities grow where they did?</i> (Nat. Geography Standard 12; fits most grade 3–8 social studies frameworks.)
+    </div>
+
+    <nav class="stepnav" aria-label="Steps">
+      <button data-step="0" aria-current="step">1 · What's where?</button>
+      <button data-step="1">2 · Why there?</button>
+      <button data-step="2">3 · Why care?</button>
+      <button data-step="3">Your turn</button>
+    </nav>
+
+    <div id="stepContent" class="step" aria-live="polite"></div>
+
+    <div class="stepactions">
+      <button class="btn ghost" id="backBtn">Back</button>
+      <button class="btn primary" id="nextBtn">Next question</button>
+    </div>
+
+    <section class="bank" aria-label="Your question bank">
+      <h3>Your question bank</h3>
+      <p class="hint">Stems collect here as you go. They work on nearly any map you put in front of students.</p>
+      <ul id="bankList"><li class="empty" id="bankEmpty">Complete step 1 to collect your first stems.</li></ul>
+      <button class="copy" id="copyBtn" hidden>Copy all stems</button>
+    </section>
+  </aside>
+
+  <div class="maparea">
+    <div id="viewDiv" role="application" aria-label="Interactive map of U.S. cities and rivers"></div>
+    <div class="notice" id="notice"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- lesson content ---------------- */
+const STEPS = [
+  {
+    coord:"Question 1 · Observe & describe",
+    title:"What's where?",
+    body:`Every geographic inquiry starts with careful observation. Each dot is a U.S. city, sized by population. Before explaining anything, students first say what they see and where it is.`,
+    why:`"What's where?" has two halves: describing one place (absolute and relative location — "on a big lake, at the top of the Midwest") and describing the whole distribution (clusters, gaps, edges). Noticing where things <i>aren't</i> is observation too.`,
+    tryit:`First, click a city and describe its location <b>without</b> naming it — only relative language. Then zoom back out and finish this sentence: "The big dots are mostly ______, and there are almost none ______."`,
+    stems:[
+      {tag:"What's where", text:"What do you see on this map? Where is ______? How would you describe its location without naming it?"},
+      {tag:"Distribution", text:"Where are there lots of ______? Where are there few or none?"}
+    ],
+    map:{rivers:false, target:"usa"}
+  },
+  {
+    coord:"Question 2 · Explain",
+    title:"Why is it there?",
+    body:`Now the map moves from describing to explaining. The rivers layer is on — a second layer is evidence students can use to build a "because."`,
+    why:`This is the leap from observation to reasoning. When students notice "the big cities sit on the water" and connect it to trade, drinking water, and transport, they've explained why cities exist where they do — without being told. Exceptions sharpen the thinking: a city that breaks the pattern demands a different "because."`,
+    tryit:`Look at the biggest dots. <b>How many sit on a river or a coastline — and why would that be?</b> Then find one that doesn't (zoom to Denver or Las Vegas) and build a different explanation for it.`,
+    stems:[
+      {tag:"Why there", text:"Why might ______ be there and not somewhere else? What clues on the map support your idea?"},
+      {tag:"Pattern", text:"What pattern do you notice when we turn this layer on? What might cause it?"},
+      {tag:"Exception", text:"Which place breaks the pattern? What different reason might explain it?"}
+    ],
+    map:{rivers:true, target:"usa"}
+  },
+  {
+    coord:"Question 3 · Relevance",
+    title:"So why does it matter to me?",
+    body:`The payoff question. Geography sticks when a national pattern lands in a student's own world — so zoom the map to your school's town.`,
+    why:`Connecting "what's where" and "why there" to the student's own place turns a map skill into an identity: "I live in a place with a geography, and I can read it." It's also where explanation becomes judgment — the past tense of the map meets the present tense of their lives.`,
+    tryit:`Zoom and pan to <b>your town</b>. Is it on water? Near a big city that is? Ask: "Why is <i>our</i> town where it is — and how does that still shape our lives today?"`,
+    stems:[
+      {tag:"Why care", text:"Does the pattern we found hold true for our town? Why is our town where it is?"},
+      {tag:"Connection", text:"How does where we live still shape our lives today — jobs, food, travel, weather?"},
+      {tag:"Judgment", text:"Knowing what you know now, would you have built our town here? Why or why not?"}
+    ],
+    map:{rivers:true, target:"local"}
+  },
+  {
+    coord:"Wrap-up · Make it yours",
+    title:"Three questions, any map",
+    body:`That's the whole routine: <b>What's where? Why is it there? Why does it matter to me?</b> Observe, explain, connect. The map changes — the questions don't. Weather maps, election maps, ancient trade routes, the school hallway: same three moves, in the same order.`,
+    why:`The order matters as much as the questions. Students describe before they explain, and explain before they judge — the same discipline as claim-evidence-reasoning, but on a map. One repeatable arc lowers the prep cost of inquiry: you don't need a new lesson plan for every map, just one habit students learn to run themselves.`,
+    tryit:`Pick a map from a unit you're teaching this month. Write your three questions using the bank below, then copy it to keep.`,
+    stems:[],
+    map:{rivers:true, target:"usa"}
+  }
+];
+
+/* ---------------- state & panel logic ---------------- */
+let current = 0;
+const visited = new Set();
+const bank = [];
+const stepBtns = [...document.querySelectorAll(".stepnav button")];
+const stepContent = document.getElementById("stepContent");
+const backBtn = document.getElementById("backBtn");
+const nextBtn = document.getElementById("nextBtn");
+const bankList = document.getElementById("bankList");
+const bankEmpty = document.getElementById("bankEmpty");
+const copyBtn = document.getElementById("copyBtn");
+
+function renderStep(i){
+  current = i;
+  const s = STEPS[i];
+  stepContent.innerHTML = `
+    <div class="coord">${s.coord}</div>
+    <h2>${s.title}</h2>
+    <p>${s.body}</p>
+    <p class="why">${s.why}</p>
+    <div class="tryit"><span class="label">Try it on the map</span>${s.tryit}</div>
+    ${s.stems.length ? `<ul class="stems">${s.stems.map(t=>
+      `<li><span class="tag">${t.tag}</span>${t.text}</li>`).join("")}</ul>` : ""}
+  `;
+  stepBtns.forEach((b,j)=>{
+    b.toggleAttribute("aria-current", j===i);
+    if(j===i) b.setAttribute("aria-current","step"); else b.removeAttribute("aria-current");
+    b.classList.toggle("done", visited.has(j) && j!==i);
+  });
+  backBtn.disabled = i===0;
+  nextBtn.textContent = i===STEPS.length-1 ? "Start over" : "Next question";
+
+  // collect stems into the bank the first time a step is seen
+  if(!visited.has(i)){
+    visited.add(i);
+    s.stems.forEach(t=>{
+      bank.push(t);
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="c">Q${i+1}</span><span>${t.text}</span>`;
+      bankList.appendChild(li);
+    });
+    if(bank.length){ bankEmpty.style.display="none"; copyBtn.hidden=false; }
+  }
+  applyMapState(s.map);
+}
+
+stepBtns.forEach(b=>b.addEventListener("click",()=>renderStep(+b.dataset.step)));
+backBtn.addEventListener("click",()=>renderStep(Math.max(0,current-1)));
+nextBtn.addEventListener("click",()=>renderStep((current+1)%STEPS.length));
+
+copyBtn.addEventListener("click",async ()=>{
+  const text = "GEOGRAPHIC QUESTION STEMS\n\n" + bank.map(t=>`[${t.tag}] ${t.text}`).join("\n");
+  try{
+    await navigator.clipboard.writeText(text);
+    copyBtn.textContent = "Copied ✓";
+  }catch{
+    copyBtn.textContent = "Select & copy below";
+    const pre = document.createElement("textarea");
+    pre.value = text; pre.style.width="100%"; pre.rows=8;
+    copyBtn.after(pre); pre.select();
+  }
+  setTimeout(()=>copyBtn.textContent="Copy all stems", 2500);
+});
+
+/* ---------------- map ---------------- */
+let view, riversLayer, usaExtent, riversVisible = false;
+const USA_EXTENT_JSON = {xmin:-14200000, ymin:2600000, xmax:-7000000, ymax:6500000,
+                    spatialReference:{wkid:102100}};
+
+function applyMapState(m){
+  riversVisible = m.rivers;
+  if(riversLayer) riversLayer.visible = m.rivers;
+  if(view && usaExtent && m.target==="usa"){
+    view.goTo(usaExtent).catch(()=>{});
+  }
+  // target "local": leave the camera alone — the teacher navigates
+}
+
+function showNotice(msg){
+  const n = document.getElementById("notice");
+  n.textContent = msg; n.style.display = "block";
+  setTimeout(()=>n.style.display="none", 9000);
+}
+
+require([
+  "esri/Map","esri/views/MapView","esri/layers/FeatureLayer",
+  "esri/widgets/Legend","esri/widgets/Expand","esri/geometry/Extent"
+], (Map, MapView, FeatureLayer, Legend, Expand, Extent) => {
+
+  usaExtent = new Extent(USA_EXTENT_JSON);
+
+/* ---- embedded city data: [name, state, lat, lon, population (2020 census)] ----
+   No network needed — cities always display, even behind school firewalls. */
+const CITY_DATA = [
+["New York","NY",40.71,-74.01,8804190],["Los Angeles","CA",34.05,-118.24,3898747],
+["Chicago","IL",41.88,-87.63,2746388],["Houston","TX",29.76,-95.37,2304580],
+["Phoenix","AZ",33.45,-112.07,1608139],["Philadelphia","PA",39.95,-75.17,1603797],
+["San Antonio","TX",29.42,-98.49,1434625],["San Diego","CA",32.72,-117.16,1386932],
+["Dallas","TX",32.78,-96.80,1304379],["San Jose","CA",37.34,-121.89,1013240],
+["Austin","TX",30.27,-97.74,961855],["Jacksonville","FL",30.33,-81.66,949611],
+["Fort Worth","TX",32.76,-97.33,918915],["Columbus","OH",39.96,-83.00,905748],
+["Indianapolis","IN",39.77,-86.16,887642],["Charlotte","NC",35.23,-80.84,874579],
+["San Francisco","CA",37.77,-122.42,873965],["Seattle","WA",47.61,-122.33,737015],
+["Denver","CO",39.74,-104.99,715522],["Washington","DC",38.91,-77.04,689545],
+["Nashville","TN",36.16,-86.78,689447],["Oklahoma City","OK",35.47,-97.52,681054],
+["El Paso","TX",31.76,-106.49,678815],["Boston","MA",42.36,-71.06,675647],
+["Portland","OR",45.52,-122.68,652503],["Las Vegas","NV",36.17,-115.14,641903],
+["Detroit","MI",42.33,-83.05,639111],["Memphis","TN",35.15,-90.05,633104],
+["Louisville","KY",38.25,-85.76,633045],["Baltimore","MD",39.29,-76.61,585708],
+["Milwaukee","WI",43.04,-87.91,577222],["Albuquerque","NM",35.08,-106.65,564559],
+["Tucson","AZ",32.22,-110.97,542629],["Fresno","CA",36.74,-119.79,542107],
+["Sacramento","CA",38.58,-121.49,524943],["Kansas City","MO",39.10,-94.58,508090],
+["Atlanta","GA",33.75,-84.39,498715],["Omaha","NE",41.26,-95.94,486051],
+["Colorado Springs","CO",38.83,-104.82,478961],["Raleigh","NC",35.78,-78.64,467665],
+["Virginia Beach","VA",36.85,-75.98,459470],["Miami","FL",25.76,-80.19,442241],
+["Oakland","CA",37.80,-122.27,440646],["Minneapolis","MN",44.98,-93.27,429954],
+["Tulsa","OK",36.15,-95.99,413066],["Bakersfield","CA",35.37,-119.02,403455],
+["Wichita","KS",37.69,-97.34,397532],["Tampa","FL",27.95,-82.46,384959],
+["New Orleans","LA",29.95,-90.07,383997],["Cleveland","OH",41.50,-81.69,372624],
+["Honolulu","HI",21.31,-157.86,350964],["Lexington","KY",38.04,-84.50,322570],
+["Stockton","CA",37.96,-121.29,320804],["Corpus Christi","TX",27.80,-97.40,317863],
+["Riverside","CA",33.95,-117.40,314998],["St. Paul","MN",44.95,-93.09,311527],
+["Cincinnati","OH",39.10,-84.51,309317],["Orlando","FL",28.54,-81.38,307573],
+["Pittsburgh","PA",40.44,-79.99,302971],["St. Louis","MO",38.63,-90.20,301578],
+["Greensboro","NC",36.07,-79.79,299035],["Anchorage","AK",61.22,-149.90,291247],
+["Durham","NC",35.99,-78.90,283506],["Buffalo","NY",42.89,-78.88,278349],
+["Toledo","OH",41.65,-83.54,270871],["Madison","WI",43.07,-89.40,269840],
+["Reno","NV",39.53,-119.81,264165],["Fort Wayne","IN",41.08,-85.14,263886],
+["St. Petersburg","FL",27.77,-82.64,258308],["Lubbock","TX",33.58,-101.86,257141],
+["Laredo","TX",27.51,-99.51,255205],["Winston-Salem","NC",36.10,-80.24,249545],
+["Norfolk","VA",36.85,-76.29,238005],["Boise","ID",43.62,-116.20,235684],
+["Spokane","WA",47.66,-117.43,228989],["Baton Rouge","LA",30.45,-91.15,227470],
+["Richmond","VA",37.54,-77.44,226610],["Tacoma","WA",47.25,-122.44,219346],
+["Huntsville","AL",34.73,-86.59,215006],["Des Moines","IA",41.59,-93.62,214133],
+["Rochester","NY",43.16,-77.61,211328],["Columbus","GA",32.46,-84.99,206922],
+["Little Rock","AR",34.75,-92.29,202591],["Augusta","GA",33.47,-81.97,202081],
+["Montgomery","AL",32.37,-86.30,200603],["Amarillo","TX",35.19,-101.85,200393],
+["Birmingham","AL",33.52,-86.81,200733],["Salt Lake City","UT",40.76,-111.89,199723],
+["Grand Rapids","MI",42.96,-85.66,198917],["Sioux Falls","SD",43.55,-96.73,192517],
+["Providence","RI",41.82,-71.41,190934],["Knoxville","TN",35.96,-83.92,190740],
+["Akron","OH",41.08,-81.52,190469],["Shreveport","LA",32.53,-93.75,187593],
+["Mobile","AL",30.69,-88.04,187041],["Fort Lauderdale","FL",26.12,-80.14,182760],
+["Eugene","OR",44.05,-123.09,176654],["Salem","OR",44.94,-123.04,175535],
+["Jackson","MS",32.30,-90.18,153701],["Charleston","SC",32.78,-79.93,150227],
+["Syracuse","NY",43.05,-76.15,148620],["Savannah","GA",32.08,-81.09,147780],
+["Cedar Rapids","IA",41.98,-91.67,137710],["Dayton","OH",39.76,-84.19,137644],
+["Columbia","SC",34.00,-81.03,136632],["Fargo","ND",46.88,-96.79,125990],
+["Hartford","CT",41.76,-72.67,121054],["Evansville","IN",37.97,-87.57,118414],
+["Billings","MT",45.78,-108.50,117116],["Wilmington","NC",34.23,-77.94,115451],
+["Las Cruces","NM",32.31,-106.78,111385],["Green Bay","WI",44.51,-88.02,107395],
+["Davenport","IA",41.52,-90.58,101724],["Albany","NY",42.65,-73.75,99224],
+["Santa Fe","NM",35.69,-105.94,87505],["Duluth","MN",46.79,-92.10,86697],
+["Rapid City","SD",44.08,-103.23,74703],["Bismarck","ND",46.81,-100.78,73622],
+["Portland","ME",43.66,-70.26,68408],["Cheyenne","WY",41.14,-104.82,65132],
+["Charleston","WV",38.35,-81.63,48864],["Burlington","VT",44.48,-73.21,44743],
+["Paducah","KY",37.07,-88.60,27137]
+];
+
+  const cities = new FeatureLayer({
+    title:"U.S. cities (dot size = population)",
+    source: CITY_DATA.map((c,i)=>({
+      geometry:{ type:"point", longitude:c[3], latitude:c[2] },
+      attributes:{ ObjectID:i, name:c[0], st:c[1], pop:c[4],
+                   popfmt:c[4].toLocaleString("en-US") }
+    })),
+    objectIdField:"ObjectID",
+    geometryType:"point",
+    spatialReference:{ wkid:4326 },
+    fields:[
+      {name:"ObjectID", type:"oid"},
+      {name:"name", type:"string"},
+      {name:"st", type:"string"},
+      {name:"pop", type:"integer"},
+      {name:"popfmt", type:"string"}
+    ],
+    renderer:{
+      type:"simple",
+      symbol:{ type:"simple-marker", color:"#c4801f",
+               outline:{color:"#ffffff", width:0.8} },
+      visualVariables:[{
+        type:"size", field:"pop",
+        minDataValue:25000, maxDataValue:8804190,
+        minSize:4, maxSize:26
+      }]
+    },
+    popupTemplate:{
+      title:"{name}, {st}",
+      content:
+        `<b>Population (2020):</b> {popfmt}<br><br>` +
+        `<i>Ask like a geographer:</i><br>` +
+        `• What's where: describe this city's location without naming it.<br>` +
+        `• Why there: what on the map might explain why people settled here?<br>` +
+        `• Why care: how might its location still shape life here today?`
+    }
+  });
+
+  riversLayer = new FeatureLayer({
+    url:"https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Rivers_and_Streams/FeatureServer/0",
+    title:"Major rivers",
+    visible:false,
+    renderer:{
+      type:"simple",
+      symbol:{ type:"simple-line", color:"#2e6e8e", width:1.4 }
+    },
+    popupTemplate:{ title:"{Name}", content:"A river — ask: which cities grew along it, and why?" }
+  });
+
+  const map = new Map({ basemap:"osm", layers:[riversLayer, cities] });
+
+  view = new MapView({
+    container:"viewDiv",
+    map,
+    extent:usaExtent,
+    constraints:{ snapToZoom:false },
+    popup:{ dockOptions:{ buttonEnabled:false } }
+  });
+
+  const legend = new Expand({
+    view, content:new Legend({view}), expandTooltip:"Legend", expanded:false
+  });
+  view.ui.add(legend, "bottom-right");
+
+  cities.when().catch(()=>showNotice(
+    "The cities layer didn't render — try refreshing the page."));
+
+  /* ---- simplified fallback rivers (approximate courses) if the service is blocked ---- */
+  const RIVERS_FALLBACK = [
+    ["Mississippi River", [[-93.27,44.98],[-91.25,43.81],[-90.58,41.52],[-90.20,38.63],[-89.17,36.99],[-90.05,35.15],[-90.88,32.35],[-91.15,30.45],[-90.07,29.95],[-89.25,29.15]]],
+    ["Missouri River", [[-111.50,45.93],[-111.30,47.50],[-106.40,48.00],[-103.60,48.15],[-100.78,46.81],[-100.35,44.37],[-96.40,42.50],[-95.94,41.26],[-94.58,39.10],[-92.17,38.58],[-90.12,38.80]]],
+    ["Ohio River", [[-79.99,40.44],[-82.44,38.42],[-84.51,39.10],[-85.76,38.25],[-87.57,37.97],[-88.60,37.07],[-89.17,36.99]]],
+    ["Colorado River", [[-105.90,40.30],[-108.55,39.06],[-109.55,38.57],[-111.46,36.91],[-112.10,36.10],[-114.74,36.02],[-114.14,34.30],[-114.62,32.69],[-114.80,31.80]]],
+    ["Columbia River", [[-117.63,48.99],[-118.98,47.95],[-120.31,47.42],[-119.23,46.23],[-120.70,45.71],[-122.40,45.60],[-123.83,46.19]]],
+    ["Snake River", [[-110.60,43.85],[-112.03,43.49],[-114.46,42.56],[-116.95,43.58],[-117.02,46.42],[-119.23,46.23]]],
+    ["Rio Grande", [[-106.50,37.70],[-106.65,35.08],[-106.49,31.76],[-100.90,29.30],[-99.51,27.51],[-97.15,25.90]]],
+    ["Arkansas River", [[-106.30,39.20],[-104.61,38.25],[-100.85,37.99],[-97.34,37.69],[-95.99,36.15],[-94.40,35.39],[-92.29,34.75],[-91.08,33.95]]],
+    ["Tennessee River", [[-83.92,35.96],[-85.31,35.05],[-86.98,34.60],[-87.68,34.80],[-88.25,35.90],[-88.60,37.07]]],
+    ["Hudson River", [[-73.70,43.97],[-73.64,43.31],[-73.75,42.65],[-73.94,41.70],[-74.02,40.70]]]
+  ];
+
+  function buildFallbackRivers(){
+    return new FeatureLayer({
+      title:"Major rivers (simplified)",
+      visible:riversVisible,
+      source: RIVERS_FALLBACK.map((r,i)=>({
+        geometry:{ type:"polyline", paths:[r[1]] },
+        attributes:{ ObjectID:i, Name:r[0] }
+      })),
+      objectIdField:"ObjectID",
+      geometryType:"polyline",
+      spatialReference:{ wkid:4326 },
+      fields:[{name:"ObjectID",type:"oid"},{name:"Name",type:"string"}],
+      renderer:{ type:"simple",
+        symbol:{ type:"simple-line", color:"#2e6e8e", width:2 } },
+      popupTemplate:{ title:"{Name}",
+        content:"A river (simplified path) — ask: which cities grew along it, and why?" }
+    });
+  }
+
+  riversLayer.when().catch(()=>{
+    map.remove(riversLayer);
+    riversLayer = buildFallbackRivers();
+    map.add(riversLayer, 0); // beneath the cities
+    showNotice("The live rivers service couldn't load, so the map switched to built-in simplified rivers. Step 2 still works.");
+  });
+});
+
+/* first render */
+renderStep(0);
+</script>
+</body>
+</html>
